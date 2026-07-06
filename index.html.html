@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generativ AI i praksis · Arena Marketing</title>
+<style>
+  :root{
+    --bg: #1b1a17;
+    --surface: #242320;
+    --surface-2: #2c2b27;
+    --border: #3d3b33;
+    --text: #ede9dd;
+    --muted: #a39e8f;
+    --accent: #d97757;        /* Claude-coral */
+    --accent-soft: #d9775726;
+    --gpt: #10a37f;
+    --gemini: #5b8ef5;
+    --good: #9cc97f;
+    --bad: #d97757;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html, body{ height:100%; }
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    /* faint dot-grid for the IT vibe */
+    background-image: radial-gradient(circle, #ffffff08 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* ---------- deck & snap ---------- */
+  .deck{
+    height:100dvh;
+    overflow-y:scroll;
+    scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;
+  }
+  .slide{
+    min-height:100dvh;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:64px clamp(24px, 7vw, 110px);
+    position:relative;
+  }
+  .slide-tag{
+    position:absolute;
+    top:28px; left:clamp(24px, 7vw, 110px);
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .slide-tag b{ color:var(--accent); font-weight:600; }
+
+  /* ---------- typography ---------- */
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:18px;
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:500;
+    font-size:clamp(40px, 6vw, 76px);
+    line-height:1.05;
+    letter-spacing:-.01em;
+    margin-bottom:22px;
+  }
+  h2{
+    font-family:var(--serif);
+    font-weight:500;
+    font-size:clamp(30px, 4.2vw, 52px);
+    line-height:1.1;
+    margin-bottom:14px;
+  }
+  .lede{
+    font-size:clamp(16px, 1.5vw, 20px);
+    color:var(--muted);
+    max-width:62ch;
+    line-height:1.55;
+  }
+
+  /* ---------- hero ---------- */
+  .hero-cursor::after{
+    content:"▌";
+    color:var(--accent);
+    animation:blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  .agenda{
+    margin-top:44px;
+    display:grid;
+    gap:0;
+    max-width:640px;
+    border-top:1px solid var(--border);
+  }
+  .agenda a{
+    display:flex;
+    align-items:baseline;
+    gap:20px;
+    padding:15px 6px;
+    border-bottom:1px solid var(--border);
+    text-decoration:none;
+    color:var(--text);
+    font-size:clamp(16px, 1.6vw, 20px);
+    transition:background .15s ease, padding-left .15s ease;
+  }
+  .agenda a:hover{ background:var(--surface); padding-left:14px; }
+  .agenda .num{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--accent);
+    min-width:28px;
+  }
+
+  /* ---------- generic bits ---------- */
+  .grid-2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:clamp(20px, 3vw, 44px);
+    align-items:start;
+    margin-top:26px;
+  }
+  @media (max-width: 880px){ .grid-2{ grid-template-columns:1fr; } }
+
+  ul.facts{ list-style:none; margin-top:8px; }
+  ul.facts li{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    padding:13px 0;
+    border-bottom:1px solid var(--border);
+    font-size:clamp(15px, 1.45vw, 19px);
+    line-height:1.5;
+  }
+  ul.facts li:first-child{ border-top:1px solid var(--border); }
+  ul.facts .emoji{ font-size:22px; line-height:1.3; }
+  ul.facts b{ color:var(--text); }
+  ul.facts span.rest{ color:var(--muted); }
+
+  .statement{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:10px;
+    padding:26px 28px;
+    font-family:var(--serif);
+    font-size:clamp(19px, 2vw, 26px);
+    line-height:1.45;
+  }
+  .statement .mark{ color:var(--accent); font-family:var(--mono); font-size:.8em; }
+
+  /* ---------- token demo ---------- */
+  .demo{
+    margin-top:28px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:clamp(18px, 2.5vw, 32px);
+  }
+  .demo-sentence{
+    font-family:var(--mono);
+    font-size:clamp(18px, 2.2vw, 28px);
+    line-height:1.6;
+    min-height:2.6em;
+    margin-bottom:22px;
+  }
+  .demo-sentence .word{
+    display:inline-block;
+    margin-right:.45em;
+    animation:pop .35s ease;
+  }
+  .demo-sentence .word.new{ color:var(--accent); }
+  .demo-sentence .caret{
+    display:inline-block;
+    color:var(--accent);
+    animation:blink 1.1s steps(1) infinite;
+  }
+  @keyframes pop{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none;} }
+
+  .cands{ display:grid; gap:10px; margin-bottom:22px; min-height:172px; }
+  .cand{
+    display:grid;
+    grid-template-columns:minmax(120px, 190px) 1fr 56px;
+    gap:14px;
+    align-items:center;
+    font-family:var(--mono);
+    font-size:clamp(13px, 1.3vw, 16px);
+    opacity:0;
+    transform:translateY(4px);
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .cand.show{ opacity:1; transform:none; }
+  .cand .bar{
+    height:12px;
+    background:var(--surface-2);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  .cand .bar i{
+    display:block;
+    height:100%;
+    width:0;
+    background:var(--muted);
+    border-radius:6px;
+    transition:width .5s ease;
+  }
+  .cand.chosen .bar i{ background:var(--accent); }
+  .cand.chosen .w, .cand.chosen .p{ color:var(--accent); font-weight:700; }
+  .cand .p{ text-align:right; color:var(--muted); }
+  .cand .w{ color:var(--text); }
+
+  .demo-controls{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .btn{
+    font-family:var(--mono);
+    font-size:14px;
+    letter-spacing:.04em;
+    padding:11px 20px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    color:var(--text);
+    cursor:pointer;
+    transition:border-color .15s, background .15s, transform .05s;
+  }
+  .btn:hover{ border-color:var(--accent); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#1b1a17; font-weight:700; }
+  .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .demo-note{
+    margin-top:18px;
+    font-size:14px;
+    color:var(--muted);
+    line-height:1.5;
+  }
+
+  /* ---------- model cards ---------- */
+  .models{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:clamp(14px, 2vw, 26px);
+    margin-top:30px;
+    align-items:stretch;
+  }
+  @media (max-width: 980px){ .models{ grid-template-columns:1fr; } }
+  .model{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:24px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .model.dim{ opacity:.82; }
+  .model header{ display:flex; align-items:center; gap:14px; }
+  .logo{
+    width:44px; height:44px;
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:19px;
+    color:#141310;
+    flex-shrink:0;
+  }
+  .model h3{ font-family:var(--serif); font-weight:500; font-size:22px; }
+  .model .role{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .model ul{ list-style:none; display:grid; gap:9px; }
+  .model li{
+    font-size:14.5px;
+    line-height:1.45;
+    color:var(--text);
+    display:flex;
+    gap:9px;
+  }
+  .model li::before{ content:"▸"; color:var(--muted); }
+  .model.claude li::before{ color:var(--accent); }
+  .model.gpt li::before{ color:var(--gpt); }
+  .model.gemini li::before{ color:var(--gemini); }
+  .model footer{
+    margin-top:auto;
+    padding-top:12px;
+    border-top:1px solid var(--border);
+    font-size:13.5px;
+    color:var(--muted);
+    line-height:1.45;
+  }
+
+  /* ---------- prompt boxes ---------- */
+  .prompt-duo{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:clamp(16px, 2.5vw, 32px);
+    margin-top:30px;
+  }
+  @media (max-width: 880px){ .prompt-duo{ grid-template-columns:1fr; } }
+  .promptbox{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .promptbox .head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface-2);
+  }
+  .promptbox .label{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .promptbox.good .label{ color:var(--good); }
+  .promptbox.bad .label{ color:var(--bad); }
+  .promptbox pre{
+    font-family:var(--mono);
+    font-size:14.5px;
+    line-height:1.65;
+    padding:18px;
+    white-space:pre-wrap;
+    word-break:break-word;
+    color:var(--text);
+    flex:1;
+  }
+  .copy{
+    font-family:var(--mono);
+    font-size:12px;
+    padding:7px 14px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--text);
+    cursor:pointer;
+    white-space:nowrap;
+    transition:border-color .15s, color .15s;
+  }
+  .copy:hover{ border-color:var(--accent); color:var(--accent); }
+  .copy.done{ border-color:var(--good); color:var(--good); }
+
+  .vs-divider{
+    text-align:center;
+    font-family:var(--mono);
+    color:var(--muted);
+    font-size:13px;
+    letter-spacing:.2em;
+    margin:22px 0 0;
+  }
+
+  /* ---------- principles ---------- */
+  .callback{
+    font-family:var(--serif);
+    font-size:clamp(17px, 1.8vw, 23px);
+    line-height:1.5;
+    color:var(--text);
+    border-left:3px solid var(--accent);
+    padding-left:20px;
+    margin:22px 0 8px;
+    max-width:60ch;
+  }
+  .callback em{ color:var(--accent); font-style:normal; }
+
+  /* ---------- placeholders ---------- */
+  .placeholder-note{
+    font-family:var(--mono);
+    color:var(--muted);
+    font-size:14px;
+    margin-top:14px;
+  }
+
+  /* ---------- dot nav ---------- */
+  .dots{
+    position:fixed;
+    right:22px;
+    top:50%;
+    transform:translateY(-50%);
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    z-index:10;
+  }
+  .dots button{
+    width:9px; height:9px;
+    border-radius:50%;
+    border:1px solid var(--muted);
+    background:transparent;
+    cursor:pointer;
+    padding:0;
+    transition:background .2s, transform .2s, border-color .2s;
+  }
+  .dots button.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    transform:scale(1.35);
+  }
+  .dots button:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+
+  /* ---------- next arrow + key hint ---------- */
+  .next{
+    position:absolute;
+    bottom:26px;
+    left:50%;
+    transform:translateX(-50%);
+    background:transparent;
+    border:none;
+    color:var(--muted);
+    font-size:24px;
+    cursor:pointer;
+    animation:bob 2.2s ease-in-out infinite;
+    padding:8px 16px;
+  }
+  .next:hover{ color:var(--accent); }
+  @keyframes bob{ 0%,100%{ transform:translate(-50%,0);} 50%{ transform:translate(-50%,6px);} }
+  .keyhint{
+    position:fixed;
+    bottom:18px;
+    left:22px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.08em;
+    color:var(--muted);
+    z-index:10;
+    opacity:.75;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .deck{ scroll-behavior:auto; }
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="dots" id="dots" aria-label="Sektioner"></nav>
+<div class="keyhint">↑ ↓ · mellemrum = næste</div>
+
+<main class="deck" id="deck">
+
+  <!-- ========== 0 · HERO ========== -->
+  <section class="slide" id="s-hero" data-title="Intro">
+    <p class="eyebrow hero-cursor">arena marketing × generativ ai</p>
+    <h1>Generativ AI<br>i praksis</h1>
+    <p class="lede">En workshop om hvad AI faktisk er, hvordan man taler med den – og hvordan I bruger den i hverdagen hos Arena Marketing.</p>
+    <div class="agenda">
+      <a href="#s-1a"><span class="num">01</span> Hvad er generativ AI?</a>
+      <a href="#s-2a"><span class="num">02</span> Claude vs. ChatGPT vs. Gemini</a>
+      <a href="#s-3a"><span class="num">03</span> God prompting</a>
+      <a href="#s-4"><span class="num">04</span> Claude i dybden: Projekter &amp; instruktioner</a>
+      <a href="#s-5"><span class="num">05</span> Strategi &amp; Q&amp;A</a>
+    </div>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 1a · TOKEN DEMO ========== -->
+  <section class="slide" id="s-1a" data-title="01 · Sådan tænker den">
+    <span class="slide-tag"><b>01</b> / hvad er generativ ai?</span>
+    <h2>Den gør kun én ting:<br>gætter det næste ord</h2>
+    <p class="lede">Ord for ord beregner modellen, hvad der mest sandsynligt kommer bagefter – ud fra alt, hvad den har set indtil nu.</p>
+
+    <div class="demo">
+      <div class="demo-sentence" id="demoSentence"></div>
+      <div class="cands" id="demoCands" aria-live="polite"></div>
+      <div class="demo-controls">
+        <button class="btn primary" id="btnStep">Næste ord →</button>
+        <button class="btn" id="btnPlay">▶ Afspil</button>
+        <button class="btn" id="btnReset">↺ Nulstil</button>
+      </div>
+      <p class="demo-note">💡 Den vælger som regel – men ikke altid – det mest sandsynlige ord. Derfor får du sjældent to helt ens svar på samme spørgsmål.</p>
+    </div>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 1b · FACTS ========== -->
+  <section class="slide" id="s-1b" data-title="01 · Hvad betyder det?">
+    <span class="slide-tag"><b>01</b> / hvad er generativ ai?</span>
+    <h2>Hvad betyder det i praksis?</h2>
+    <div class="grid-2">
+      <ul class="facts">
+        <li><span class="emoji">🎲</span><span><b>Den gætter – lynhurtigt og imponerende godt.</b> <span class="rest">Trænet på enorme mængder tekst: bøger, artikler, hjemmesider.</span></span></li>
+        <li><span class="emoji">🧠</span><span><b>Den "ved" ikke ting.</b> <span class="rest">Den genkender mønstre i sprog – den slår ikke op i en database.</span></span></li>
+        <li><span class="emoji">🤥</span><span><b>Hallucination = et selvsikkert gæt.</b> <span class="rest">Når den ikke ved svaret, digter den noget, der lyder rigtigt. Den lyver ikke – den gætter.</span></span></li>
+        <li><span class="emoji">🏢</span><span><b>Den kender ikke jeres virksomhed.</b> <span class="rest">Alt om Arena, jeres kunder og jeres tone skal I selv fortælle den.</span></span></li>
+        <li><span class="emoji">⚖️</span><span><b>Input = output.</b> <span class="rest">Jo mere kontekst den får, desto bedre bliver dens gæt. Vage spørgsmål giver vage svar.</span></span></li>
+      </ul>
+      <div>
+        <div class="statement">
+          <span class="mark">✳</span> Tænk på den som en <b>ekstremt belæst praktikant på sin første arbejdsdag</b>: dygtig, lynhurtig – men den ved intet om jer, før I fortæller det.
+        </div>
+      </div>
+    </div>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 2a · MODELLER ========== -->
+  <section class="slide" id="s-2a" data-title="02 · Modellerne">
+    <span class="slide-tag"><b>02</b> / claude vs. chatgpt vs. gemini</span>
+    <h2>Tre assistenter – tre styrker</h2>
+    <p class="lede">Modellerne er tættere på hinanden, end folk tror. Forskellen ligger i, hvad de er bygget bedst til i hverdagen.</p>
+
+    <div class="models">
+      <div class="model gpt">
+        <header>
+          <div class="logo" style="background:var(--gpt)">G</div>
+          <div>
+            <h3>ChatGPT</h3>
+            <p class="role">Hverdagens schweizerkniv</p>
+          </div>
+        </header>
+        <ul>
+          <li>Hurtige svar og hverdagsopgaver</li>
+          <li>Opsummeringer og letforståelige forklaringer</li>
+          <li>Søgning – godt alternativ til Google</li>
+          <li>Billedgenerering</li>
+          <li>Brainstorm og idéudvikling</li>
+        </ul>
+        <footer>Den mest udbredte – god første indgang til AI.</footer>
+      </div>
+
+      <div class="model claude">
+        <header>
+          <div class="logo" style="background:var(--accent)">✳</div>
+          <div>
+            <h3>Claude</h3>
+            <p class="role">Den professionelle kollega</p>
+          </div>
+        </header>
+        <ul>
+          <li>Længere arbejdsopgaver og store dokumenter</li>
+          <li>Agentarbejde – løser opgaver i flere trin selv</li>
+          <li>Producerer <b>produkter</b>: slides, hjemmesider, Excel</li>
+          <li>Stærk tekstkvalitet og tone-of-voice</li>
+          <li>Projekter &amp; instruktioner: husker jeres kontekst</li>
+          <li>Integrationer: Drive, Canva, mail m.fl.</li>
+        </ul>
+        <footer>Bygget til arbejde – ikke kun til samtale.</footer>
+      </div>
+
+      <div class="model gemini dim">
+        <header>
+          <div class="logo" style="background:var(--gemini)">✦</div>
+          <div>
+            <h3>Gemini</h3>
+            <p class="role">Googles bud – kort nævnt</p>
+          </div>
+        </header>
+        <ul>
+          <li>Indbygget i Google-universet: Gmail, Docs, Søgning</li>
+          <li><b>Videogenerering</b> – korte klip som dem, I ser på Instagram og TikTok</li>
+          <li>Stærk til billeder, lyd og video i samme værktøj</li>
+        </ul>
+        <footer>Ikke vores fokus i dag – men værd at kende for video.</footer>
+      </div>
+    </div>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 2b · LIVE TEST ========== -->
+  <section class="slide" id="s-2b" data-title="02 · Prøv det live">
+    <span class="slide-tag"><b>02</b> / claude vs. chatgpt vs. gemini</span>
+    <h2>Samme prompt – to modeller</h2>
+    <p class="lede">Vi kopierer nøjagtig samme prompt ind i ChatGPT og Claude og sammenligner svarene live. Læg mærke til forskellen i struktur, tone og længde.</p>
+
+    <div class="prompt-duo">
+      <div class="promptbox">
+        <div class="head">
+          <span class="label" style="color:var(--gpt)">→ ChatGPT</span>
+          <button class="copy" data-copy="p-live">Kopiér</button>
+        </div>
+        <pre id="p-live">Skriv et opslag til sociale medier om et sommerarrangement i en boligforening.</pre>
+      </div>
+      <div class="promptbox">
+        <div class="head">
+          <span class="label" style="color:var(--accent)">→ Claude</span>
+          <button class="copy" data-copy="p-live2">Kopiér</button>
+        </div>
+        <pre id="p-live2">Skriv et opslag til sociale medier om et sommerarrangement i en boligforening.</pre>
+      </div>
+    </div>
+    <p class="demo-note" style="margin-top:20px">🎯 Pointen: prompten er bevidst vag. Begge modeller <i>gætter</i> på, hvad vi mener – bare på hver deres måde. Det leder direkte til næste del: hvordan man fjerner gættearbejdet.</p>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 3a · PRINCIPPER ========== -->
+  <section class="slide" id="s-3a" data-title="03 · God prompting">
+    <span class="slide-tag"><b>03</b> / god prompting</span>
+    <h2>God prompting = god kontekst</h2>
+    <p class="callback">Husk mekanismen: den gætter næste ord ud fra <em>alt, hvad du har givet den</em>. Mere og bedre input → bedre gæt.</p>
+    <ul class="facts" style="max-width:760px">
+      <li><span class="emoji">🎯</span><span><b>Giv kontekst.</b> <span class="rest">Hvem er du, hvem er modtageren, og hvad er formålet?</span></span></li>
+      <li><span class="emoji">📐</span><span><b>Vær specifik om resultatet.</b> <span class="rest">Format, længde og tone – "en mail på max 120 ord, venlig men professionel".</span></span></li>
+      <li><span class="emoji">🖼️</span><span><b>Vis eksempler.</b> <span class="rest">Indsæt en tekst, I kan lide – "skriv i denne stil".</span></span></li>
+      <li><span class="emoji">🔁</span><span><b>Behandl det som en samtale.</b> <span class="rest">Jagt ikke den perfekte prompt – ret til: "kortere", "mere jordnær", "drop punkt 2".</span></span></li>
+    </ul>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 3b · DÅRLIG VS GOD ========== -->
+  <section class="slide" id="s-3b" data-title="03 · Dårlig vs. god">
+    <span class="slide-tag"><b>03</b> / god prompting</span>
+    <h2>Dårlig vs. god prompt</h2>
+    <p class="lede">Samme opgave, to prompts. Vi kører begge live og ser forskellen.</p>
+
+    <div class="prompt-duo">
+      <div class="promptbox bad">
+        <div class="head">
+          <span class="label">✗ Dårlig prompt</span>
+          <button class="copy" data-copy="p-bad1">Kopiér</button>
+        </div>
+        <pre id="p-bad1">Skriv en mail til en kunde</pre>
+      </div>
+      <div class="promptbox good">
+        <div class="head">
+          <span class="label">✓ God prompt</span>
+          <button class="copy" data-copy="p-good1">Kopiér</button>
+        </div>
+        <pre id="p-good1">Du er sælger hos Arena Marketing – et medie- og eventhus, der forbinder virksomheder med bestyrelser i boligforeninger.
+
+Skriv en kort mail (max 120 ord) til indehaveren af en lokal el-installatørvirksomhed. Formål: book et 20-minutters møde om, hvordan de kan markedsføre sig direkte over for boligforeningsbestyrelser.
+
+Tone: venlig og professionel, ingen buzzwords. Afslut med to konkrete forslag til mødetidspunkter.</pre>
+      </div>
+    </div>
+
+    <p class="vs-divider">— ELLER PRØV DENNE —</p>
+
+    <div class="prompt-duo" style="margin-top:18px">
+      <div class="promptbox bad">
+        <div class="head">
+          <span class="label">✗ Dårlig prompt</span>
+          <button class="copy" data-copy="p-bad2">Kopiér</button>
+        </div>
+        <pre id="p-bad2">Lav noget tekst til vores hjemmeside</pre>
+      </div>
+      <div class="promptbox good">
+        <div class="head">
+          <span class="label">✓ God prompt</span>
+          <button class="copy" data-copy="p-good2">Kopiér</button>
+        </div>
+        <pre id="p-good2">Skriv en tekst på ca. 100 ord til forsiden af Arena Marketings hjemmeside.
+
+Målgruppe: virksomheder der overvejer at markedsføre sig over for boligforeninger.
+Tone: professionel men jordnær, ingen buzzwords.
+Én hovedpointe: vi giver direkte adgang til beslutningstagerne i boligforeningerne.
+
+Afslut med en kort opfordring til at kontakte os.</pre>
+      </div>
+    </div>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 4 · PLACEHOLDER ========== -->
+  <section class="slide" id="s-4" data-title="04 · Claude i dybden">
+    <span class="slide-tag"><b>04</b> / claude i dybden</span>
+    <h2>Projekter &amp; instruktioner</h2>
+    <p class="lede">Sådan giver man Claude varig viden om jeres virksomhed – én gang, i stedet for at starte forfra hver gang.</p>
+    <p class="placeholder-note">[ Denne sektion bygger vi færdig sammen – live demo af et Arena-projekt ]</p>
+    <button class="next" aria-label="Næste sektion">↓</button>
+  </section>
+
+  <!-- ========== 5 · PLACEHOLDER ========== -->
+  <section class="slide" id="s-5" data-title="05 · Strategi & Q&A">
+    <span class="slide-tag"><b>05</b> / strategi &amp; q&amp;a</span>
+    <h2>Strategi &amp; Q&amp;A</h2>
+    <p class="lede">AI i Arenas fremtidige arbejde og produkter – åben snak og spørgsmål.</p>
+    <p class="placeholder-note">[ Denne sektion bygger vi færdig sammen ]</p>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dotsWrap = document.getElementById('dots');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- dot nav ---------- */
+  slides.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', s.dataset.title || ('Sektion ' + (i+1)));
+    b.addEventListener('click', () => s.scrollIntoView({behavior: reduced ? 'auto' : 'smooth'}));
+    dotsWrap.appendChild(b);
+  });
+  const dots = Array.from(dotsWrap.children);
+
+  let current = 0;
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        current = slides.indexOf(e.target);
+        dots.forEach((d, i) => d.classList.toggle('active', i === current));
+      }
+    });
+  }, {root: deck, threshold: 0.55});
+  slides.forEach(s => io.observe(s));
+
+  /* ---------- keyboard nav ---------- */
+  function go(delta){
+    const next = Math.min(slides.length - 1, Math.max(0, current + delta));
+    slides[next].scrollIntoView({behavior: reduced ? 'auto' : 'smooth'});
+  }
+  window.addEventListener('keydown', e => {
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if(['ArrowDown','PageDown',' '].includes(e.key)){ e.preventDefault(); go(1); }
+    if(['ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); go(-1); }
+    if(e.key === 'Home'){ e.preventDefault(); slides[0].scrollIntoView(); }
+    if(e.key === 'End'){ e.preventDefault(); slides[slides.length-1].scrollIntoView(); }
+  });
+
+  /* ---------- next arrows ---------- */
+  document.querySelectorAll('.next').forEach(btn => {
+    btn.addEventListener('click', () => go(1));
+  });
+
+  /* ---------- copy buttons ---------- */
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = document.getElementById(btn.dataset.copy).innerText;
+      try{
+        await navigator.clipboard.writeText(text);
+      }catch(_){
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy'); ta.remove();
+      }
+      const old = btn.textContent;
+      btn.textContent = 'Kopieret ✓';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+    });
+  });
+
+  /* ---------- token demo ---------- */
+  const seed = ['Boligforeningen', 'holder'];
+  const steps = [
+    { cands: [['generalforsamling', 58], ['møde', 22], ['sommerfest', 11], ['lukket', 4]], pick: 0 },
+    { cands: [['hvert', 34], ['i', 31], ['torsdag', 18], ['snart', 9]], pick: 0 },
+    { cands: [['år', 83], ['kvartal', 8], ['forår', 5], ['andet', 2]], pick: 0 },
+    { cands: [['i', 52], ['for', 19], ['med', 12], ['den', 8]], pick: 0 },
+    { cands: [['maj', 33], ['fælleshuset', 29], ['april', 18], ['kælderen', 6]], pick: 1 },
+    { cands: [['.', 45], ['med', 27], ['sammen', 14], ['klokken', 8]], pick: 0 },
+  ];
+
+  const elSentence = document.getElementById('demoSentence');
+  const elCands = document.getElementById('demoCands');
+  const btnStep = document.getElementById('btnStep');
+  const btnPlay = document.getElementById('btnPlay');
+  const btnReset = document.getElementById('btnReset');
+
+  let stepIdx = 0;
+  let words = [];
+  let playing = null;
+
+  function renderSentence(){
+    elSentence.innerHTML = '';
+    words.forEach((w, i) => {
+      const span = document.createElement('span');
+      span.className = 'word' + (i === words.length - 1 && stepIdx > 0 ? ' new' : '');
+      span.textContent = w;
+      elSentence.appendChild(span);
+    });
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.textContent = '▌';
+    elSentence.appendChild(caret);
+  }
+
+  function renderCands(step){
+    elCands.innerHTML = '';
+    if(!step){
+      const done = document.createElement('p');
+      done.style.cssText = 'font-family:var(--mono);color:var(--good);font-size:15px;align-self:center;';
+      done.textContent = '✓ Sætning færdig — og sådan skriver den alt: ét sandsynligt ord ad gangen.';
+      elCands.appendChild(done);
+      return;
+    }
+    step.cands.forEach(([w, p], i) => {
+      const row = document.createElement('div');
+      row.className = 'cand' + (i === step.pick ? ' chosen' : '');
+      row.innerHTML = '<span class="w">' + w + '</span><span class="bar"><i></i></span><span class="p">' + p + '%</span>';
+      elCands.appendChild(row);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        row.classList.add('show');
+        row.querySelector('i').style.width = p + '%';
+      }));
+    });
+  }
+
+  function doStep(){
+    if(stepIdx >= steps.length){ stopPlay(); return; }
+    const step = steps[stepIdx];
+    renderCands(step);
+    setTimeout(() => {
+      const w = step.cands[step.pick][0];
+      words.push(w);
+      stepIdx++;
+      renderSentence();
+      if(stepIdx >= steps.length){
+        renderCands(null);
+        stopPlay();
+        btnStep.disabled = true;
+        btnStep.style.opacity = .5;
+      }
+    }, reduced ? 200 : 950);
+  }
+
+  function reset(){
+    stopPlay();
+    stepIdx = 0;
+    words = seed.slice();
+    btnStep.disabled = false;
+    btnStep.style.opacity = 1;
+    elCands.innerHTML = '';
+    renderSentence();
+  }
+
+  function stopPlay(){
+    if(playing){ clearInterval(playing); playing = null; btnPlay.textContent = '▶ Afspil'; }
+  }
+
+  btnStep.addEventListener('click', () => { stopPlay(); doStep(); });
+  btnPlay.addEventListener('click', () => {
+    if(playing){ stopPlay(); return; }
+    btnPlay.textContent = '⏸ Pause';
+    doStep();
+    playing = setInterval(() => {
+      if(stepIdx >= steps.length){ stopPlay(); return; }
+      doStep();
+    }, reduced ? 700 : 2100);
+  });
+  btnReset.addEventListener('click', reset);
+
+  reset();
+})();
+</script>
+</body>
+</html>
